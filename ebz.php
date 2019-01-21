@@ -9,10 +9,16 @@
 * Copyright 2019 ZubiLabs AB
 * License: GPL3
 */
+if (!defined('ABSPATH'))
+{
+    exit;
+} // Exit if accessed directly
 
-/**
-* Insert Headers and Footers Class
-*/
+if (!class_exists('WooCommerce'))
+{
+    exit;
+}// Exit if WooCommerce is not active
+
 class eCommerceByZubi {
 	/**
 	* Constructor
@@ -36,6 +42,7 @@ class eCommerceByZubi {
 
         // Frontend Hooks
         add_action( 'wp_head', array( &$this, 'allPages' ) );
+		add_action('woocommerce_thankyou', array( &$this, 'customReadOrder' ) );
 		//add_action( 'wp_footer', array( &$this, 'frontendFooter' ) );
 	}
 
@@ -127,19 +134,44 @@ class eCommerceByZubi {
 		load_plugin_textdomain( $this->plugin->name, false, $this->plugin->name . '/languages/' );
 	}
 
-	/**
-	* Outputs script / CSS to the frontend header
-	*/
 	function allPages() {
 		$this->output( 'ebz_user_key', 'ebz_store_name' );
 		//$this->output( 'ebz_user_key' );
 	}
 
-	/**
-	* Outputs script / CSS to the frontend footer
-	*/
-	function frontendFooter() {
-		//$this->output( 'ebz_store_name' );
+	function customReadOrder($order_id) {
+		//getting order object
+		$order = wc_get_order($order_id);
+
+		$items = $order->get_items();
+		$product_js = [];
+
+		foreach ($items as $item_id => $item_data) {
+			//getting product object
+			$_product = wc_get_product($item_data['item_meta']['_product_id'][0]);
+
+			//getting all the product category
+			$pro_cat_array = wp_get_post_terms($_product->ID, 'product_cat');
+
+			$sku = $sku = $_product->get_sku();
+			$qty = $item_data['item_meta']['_qty'][0];
+			$pro_cat = implode(',', $pro_cat_array);
+			$pro_brand = $_product->get_attribute('pa_brand'); //replace it with your brand attribute slug
+			$pro_price = $item_data['item_meta']['_line_total'][0];
+
+			//storing all the line item as a string form
+			$product_js[] = '{id: "' . $sku . '",category:"' . $pro_cat . '",brand:"' . $pro_brand . '",price: "' . $pro_price . '"quantity:"' . $qty . '"}';
+		}
+
+		?>
+		<script type="text/javascript">
+			order.purchase = {
+				currency: 'EUR',
+				transactionId: '<?= $order->id ?>',
+				products: [<?= implode(',', $product_js) ?>]
+			};
+		</script>
+		<?php
 	}
 
 	/**
@@ -176,7 +208,23 @@ class eCommerceByZubi {
 		$sname = str_replace(array('\'', '"'), '', $sname);
 		$cd = str_replace('www','', parse_url(get_site_url(), PHP_URL_HOST));
 		
-		$meta = '<script type="text/javascript">;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)};p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];n.async=1;n.src=w;g.parentNode.insertBefore(n,g)}}(window,document,"script","//d1fc8wv8zag5ca.cloudfront.net/2.9.3/sp.js","snowplow"));window.snowplow("newTracker", "'.$ukey.'", "tracker.zubi.ai", {appId: "'.$sname.'",cookieDomain: "'.$cd.'",forceSecureTracker: true,cookieName: "zl",contexts: {webPage: true,gaCookies: true}});window.snowplow("trackPageView");window.snowplow("enableLinkClickTracking");snowplow("enableFormTracking");</script>';
+		$meta = '<script type="text/javascript">
+					;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];
+					p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)};
+					p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];
+					n.async=1;n.src=w;g.parentNode.insertBefore(n,g)}}
+					(window,document,"script","//d1fc8wv8zag5ca.cloudfront.net/2.9.3/sp.js","zubitracker"));
+					window.snowplow("newTracker", "'.$ukey.'", "tracker.zubi.ai", {
+						appId: "'.$sname.'",
+						cookieDomain: "'.$cd.'",
+						forceSecureTracker: true,
+						cookieName: "zl",
+						contexts: {webPage: true,gaCookies: true}
+					});
+					window.zubitracker("trackPageView");
+					window.zubitracker("enableLinkClickTracking");
+					zubitracker("enableFormTracking");
+				</script>';
 
 		// Output
 		echo wp_unslash( $meta );
