@@ -13,18 +13,16 @@ if (!defined('ABSPATH'))
 {
     exit;
 } // Exit if accessed directly
-
-if (!class_exists('WooCommerce'))
+/*if (!class_exists('WooCommerce'))
 {
     exit;
 }// Exit if WooCommerce is not active
-
+*/
 class eCommerceByZubi {
 	/**
 	* Constructor
 	*/
 	public function __construct() {
-
 		// Plugin Details
         $this->plugin               = new stdClass;
         $this->plugin->name         = 'ecommerce-by-zubi'; // Plugin Folder
@@ -33,25 +31,21 @@ class eCommerceByZubi {
         $this->plugin->folder       = plugin_dir_path( __FILE__ );
         $this->plugin->url          = plugin_dir_url( __FILE__ );
         $this->plugin->db_welcome_dismissed_key = $this->plugin->name . '_welcome_dismissed_key';
-
 		// Hooks
 		add_action( 'admin_init', array( &$this, 'registerSettings' ) );
         add_action( 'admin_menu', array( &$this, 'adminPanelsAndMetaBoxes' ) );
         add_action( 'admin_notices', array( &$this, 'dashboardNotices' ) );
         add_action( 'wp_ajax_' . $this->plugin->name . '_dismiss_dashboard_notices', array( &$this, 'dismissDashboardNotices' ) );
-
         // Frontend Hooks
         add_action( 'wp_head', array( &$this, 'allPages' ) );
 		add_action('woocommerce_thankyou', array( &$this, 'customReadOrder' ) );
 		//add_action( 'wp_footer', array( &$this, 'frontendFooter' ) );
 	}
-
     /**
      * Show relevant notices for the plugin
      */
     function dashboardNotices() {
         global $pagenow;
-
         if ( !get_option( $this->plugin->db_welcome_dismissed_key ) ) {
         	if ( ! ( $pagenow == 'options-general.php' && isset( $_GET['page'] ) && $_GET['page'] == 'ecommerce-by-zubi' ) ) {
 	            $setting_page = admin_url( 'options-general.php?page=' . $this->plugin->name );
@@ -60,7 +54,6 @@ class eCommerceByZubi {
         	}
         }
     }
-
     /**
      * Dismiss the welcome notice for the plugin
      */
@@ -70,7 +63,6 @@ class eCommerceByZubi {
         update_option( $this->plugin->db_welcome_dismissed_key, 1 );
         exit;
     }
-
 	/**
 	* Register Settings
 	*/
@@ -78,14 +70,12 @@ class eCommerceByZubi {
 		register_setting( $this->plugin->name, 'ebz_user_key', 'trim' );
 		register_setting( $this->plugin->name, 'ebz_store_name', 'trim' );
 	}
-
 	/**
     * Register the plugin settings panel
     */
     function adminPanelsAndMetaBoxes() {
     	add_submenu_page( 'options-general.php', $this->plugin->displayName, $this->plugin->displayName, 'manage_options', $this->plugin->name, array( &$this, 'adminPanel' ) );
 	}
-
     /**
     * Output the Administration Panel
     * Save POSTed data from the Administration Panel into a WordPress option
@@ -96,7 +86,6 @@ class eCommerceByZubi {
 			echo '<p>' . __( 'Sorry, you are not allowed to access this page.', $this->plugin->name ) . '</p>';
 			return;
 		}
-
     	// Save Settings
         if ( isset( $_REQUEST['submit'] ) ) {
         	// Check nonce
@@ -116,64 +105,62 @@ class eCommerceByZubi {
 				$this->message = __( 'Settings Saved.', $this->plugin->name );
 			}
         }
-
         // Get latest settings
         $this->settings = array(
 			'ebz_user_key' => esc_html( wp_unslash( get_option( 'ebz_user_key' ) ) ),
 			'ebz_store_name' => esc_html( wp_unslash( get_option( 'ebz_store_name' ) ) ),
         );
-
     	// Load Settings Form
         include_once( WP_PLUGIN_DIR . '/' . $this->plugin->name . '/views/settings.php' );
     }
-
     /**
 	* Loads plugin textdomain
 	*/
 	function loadLanguageFiles() {
 		load_plugin_textdomain( $this->plugin->name, false, $this->plugin->name . '/languages/' );
 	}
-
 	function allPages() {
 		$this->output( 'ebz_user_key', 'ebz_store_name' );
 		//$this->output( 'ebz_user_key' );
 	}
-
 	function customReadOrder($order_id) {
+		$sname = get_option( 'ebz_store_name' );
+		if ( empty( $sname ) ) {
+			$sname = 'default_store';
+		}
 		//getting order object
 		$order = wc_get_order($order_id);
-
-		$items = $order->get_items();
-		$product_js = [];
-
-		foreach ($items as $item_id => $item_data) {
-			//getting product object
-			$_product = wc_get_product($item_data['item_meta']['_product_id'][0]);
-
-			//getting all the product category
-			$pro_cat_array = wp_get_post_terms($_product->ID, 'product_cat');
-
-			$sku = $sku = $_product->get_sku();
-			$qty = $item_data['item_meta']['_qty'][0];
-			$pro_cat = implode(',', $pro_cat_array);
-			$pro_brand = $_product->get_attribute('pa_brand'); //replace it with your brand attribute slug
-			$pro_price = $item_data['item_meta']['_line_total'][0];
-
-			//storing all the line item as a string form
-			$product_js[] = '{id: "' . $sku . '",category:"' . $pro_cat . '",brand:"' . $pro_brand . '",price: "' . $pro_price . '"quantity:"' . $qty . '"}';
-		}
-
+		
 		?>
 		<script type="text/javascript">
-			order.purchase = {
-				currency: 'EUR',
-				transactionId: '<?= $order->id ?>',
-				products: [<?= implode(',', $product_js) ?>]
-			};
+			zubitracker('addTrans',
+				'<?= $order->get_id() ?>',           	 // order ID - required
+				'<?= $sname ?>',						 // affiliation or store name
+				'<?= $order->get_total() ?>',          	 // total - required
+				'<?= $order->get_total_tax() ?>',        // tax
+				'<?= $order->get_shipping_total() ?>',   // shipping
+				'<?= $order->get_billing_city() ?>',     // city
+				'<?= $order->get_billing_state() ?>',    // state or province
+				'<?= $order->get_billing_country() ?>'   // country
+			);
+		</script>
+		<?php
+		
+		$items = $order->get_items();
+		foreach ($items as $item_id => $item_data) {
+			// Get an instance of corresponding the WC_Product object
+			$product = $item_data->get_product();
+			$item_quantity = $item_data->get_quantity(); // Get the item quantity
+			$unit_price = number_format(((float)$item_data->get_total()/(float)$item_quantity), 2, '.', '');
+			
+			echo '<script type="text/javascript">zubitracker("addItem","<?= $order->id ?>","<?= $product->get_id() ?>","<?= $product->get_name() ?>","","<?= $unit_price ?>","<?= $item_quantity ?>");</script>';
+		}
+		?>
+		<script type="text/javascript">
+			zubitracker('trackTrans'); //submits transaction to the collector
 		</script>
 		<?php
 	}
-
 	/**
 	* Outputs the given setting, if conditions are met
 	*
@@ -185,12 +172,10 @@ class eCommerceByZubi {
 		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
 			return;
 		}
-
 		// provide the opportunity to Ignore ebz
 		if ( apply_filters( 'disable_ebz', false ) ) {
 			return;
 		}
-
 		// Get meta
 		$ukey = get_option( $key );
 		$sname = get_option( $name );
@@ -225,10 +210,8 @@ class eCommerceByZubi {
 					window.zubitracker("enableLinkClickTracking");
 					zubitracker("enableFormTracking");
 				</script>';
-
 		// Output
 		echo wp_unslash( $meta );
 	}
 }
-
 $ebz = new eCommerceByZubi();
