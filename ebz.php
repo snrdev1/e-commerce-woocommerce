@@ -37,16 +37,6 @@ class eCommerceByZubi {
         // Frontend Hooks
         add_action( 'wp_head', array( &$this, 'allPages' ) );
 		//add_action( 'wp_footer', array( &$this, 'frontendFooter' ) );
-
-		// Filters
-		add_filter( 'dashboard_secondary_items', array( &$this, 'dashboardSecondaryItems' ) );
-	}
-
-    /**
-     * Number of Secondary feed items to show
-     */
-	function dashboardSecondaryItems() {
-		return 6;
 	}
 
     /**
@@ -141,8 +131,8 @@ class eCommerceByZubi {
 	* Outputs script / CSS to the frontend header
 	*/
 	function allPages() {
-		//$this->output( 'ebz_user_key', 'ebz_store_name' );
-		$this->output( 'ebz_user_key' );
+		$this->output( 'ebz_user_key', 'ebz_store_name' );
+		//$this->output( 'ebz_user_key' );
 	}
 
 	/**
@@ -158,35 +148,35 @@ class eCommerceByZubi {
 	* @param string $setting Setting Name
 	* @return output
 	*/
-	function output( $setting ) {
+	function output( $key, $name ) {
 		// Ignore admin, feed, robots or trackbacks
 		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
 			return;
 		}
 
-		// provide the opportunity to Ignore IHAF - both headers and footers via filters
+		// provide the opportunity to Ignore ebz
 		if ( apply_filters( 'disable_ebz', false ) ) {
 			return;
 		}
 
-		// provide the opportunity to Ignore IHAF - footer only via filters
-		//if ( 'ihaf_insert_footer' == $setting && apply_filters( 'disable_ihaf_footer', false ) ) {
-		//	return;
-		//}
-
-		// provide the opportunity to Ignore IHAF - header only via filters
-		if ( 'ebz_user_key' == $setting && apply_filters( 'disable_ebz_user_key', false ) ) {
-			return;
-		}
-
 		// Get meta
-		$meta = get_option( $setting );
-		if ( empty( $meta ) ) {
+		$ukey = get_option( $key );
+		$sname = get_option( $name );
+		if ( empty( $sname ) ) {
+			$sname = 'default_store';
+		}
+		if ( empty( $ukey ) ) {
 			return;
 		}
-		if ( trim( $meta ) == '' ) {
+		if ( trim( $ukey ) == '' ) {
 			return;
 		}
+		
+		$ukey = str_replace(array('\'', '"'), '', $ukey);
+		$sname = str_replace(array('\'', '"'), '', $sname);
+		$cd = str_replace('www','', parse_url(get_site_url(), PHP_URL_HOST));
+		
+		$meta = '<script type="text/javascript">;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)};p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];n.async=1;n.src=w;g.parentNode.insertBefore(n,g)}}(window,document,"script","//d1fc8wv8zag5ca.cloudfront.net/2.9.3/sp.js","snowplow"));window.snowplow("newTracker", "'.$ukey.'", "tracker.zubi.ai", {appId: "'.$sname.'",cookieDomain: "'.$cd.'",forceSecureTracker: true,cookieName: "zl",contexts: {webPage: true,gaCookies: true}});window.snowplow("trackPageView");window.snowplow("enableLinkClickTracking");snowplow("enableFormTracking");</script>';
 
 		// Output
 		echo wp_unslash( $meta );
