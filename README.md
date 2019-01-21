@@ -1,4 +1,5 @@
 === eCommerce by zubi ===
+
 Contributors: zubi.ai
 Tags: track, visitors, tracking code, content personalization, facebook pixel, product recommendation, cross-sell, up-sell, google analytics, instagram ads, cross sell, upsell, checkout recommendation, woocommerce, track events, events, add to cart, increase sales, conversion rate, sales analytics, analytics, ai, artificial intelligence, e-commerce, ecommerce, store ai, email personalization, segmentation, insights, customer lifetime value
 Requires at least: 3.6
