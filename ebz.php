@@ -38,8 +38,10 @@ class eCommerceByZubi {
         add_action( 'wp_ajax_' . $this->plugin->name . '_dismiss_dashboard_notices', array( &$this, 'dismissDashboardNotices' ) );
         // Frontend Hooks
         add_action( 'wp_head', array( &$this, 'allPages' ) );
-		add_action('woocommerce_thankyou', array( &$this, 'customReadOrder' ) );
-		//add_action( 'wp_footer', array( &$this, 'frontendFooter' ) );
+		add_action( 'woocommerce_before_single_product', array( &$this, 'productPages' ) );
+		add_action( 'woocommerce_add_to_cart', array( &$this, 'custom_add_to_cart'), 10, 6 );
+		add_action( 'woocommerce_remove_cart_item', array( &$this, 'custom_remove_from_cart') );
+		add_action( 'woocommerce_thankyou', array( &$this, 'customReadOrder' ) );
 	}
     /**
      * Show relevant notices for the plugin
@@ -119,11 +121,60 @@ class eCommerceByZubi {
 	function loadLanguageFiles() {
 		load_plugin_textdomain( $this->plugin->name, false, $this->plugin->name . '/languages/' );
 	}
-	function allPages() {
-		$this->output( 'ebz_user_key', 'ebz_store_name' );
-		//$this->output( 'ebz_user_key' );
+	// window.snowplow_name_here('trackRemoveFromCart', '000345', 'blue tie', 'clothing', 3.49, 1, 'GBP');
+	function custom_add_to_cart($cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data){
+		// Ignore admin, feed, robots or trackbacks
+		//if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
+		//	return;
+		//}
+		// provide the opportunity to Ignore ebz
+		//if ( apply_filters( 'disable_ebz', false ) ) {
+		//	return;
+		//}
+        //global $woocommerce; 
+        //$currency = get_woocommerce_currency();
+		//$product = wc_get_product( $product_id );
+		//echo '<script type="text/javascript">window.zubitracker("trackAddToCart", "'.$product_id.'", "", "", "'.$product->get_price().'", "'.$quantity.'", "'.$currency.'");}</script>';
+	}
+	// do_action( 'woocommerce_cart_item_removed', $cart_item_key, $this );
+	function custom_remove_from_cart(){
+		// FULL FUNCTIONALITY REQUIRES REINSERT TO CART AND UPDATE QTY IN CART...
+		
+		// Ignore admin, feed, robots or trackbacks
+		//if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
+		//	return;
+		//}
+		// provide the opportunity to Ignore ebz
+		//if ( apply_filters( 'disable_ebz', false ) ) {
+		//	return;
+		//}
+        //echo'<script language="javascript">alert("Test");</script>';
+		//global $woocommerce; 
+        //$currency = get_woocommerce_currency();
+		//$product = wc_get_product( $product_id );
+		//echo '<script language="javascript"></script>';
+	}
+	function productPages() {
+		// Ignore admin, feed, robots or trackbacks
+		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
+			return;
+		}
+		// provide the opportunity to Ignore ebz
+		if ( apply_filters( 'disable_ebz', false ) ) {
+			return;
+		}
+		global $product;
+		echo '<script type="text/javascript">window.zubitracker("addEnhancedEcommerceProductContext","'.$product->get_id().'","'.$product->get_name().'");window.zubitracker("trackEnhancedEcommerceAction","view");</script>';
 	}
 	function customReadOrder($order_id) {
+		// Ignore admin, feed, robots or trackbacks
+		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
+			return;
+		}
+		// provide the opportunity to Ignore ebz
+		if ( apply_filters( 'disable_ebz', false ) ) {
+			return;
+		}
 		$sname = get_option( 'ebz_store_name' );
 		if ( empty( $sname ) ) {
 			$sname = 'default_store';
@@ -131,20 +182,7 @@ class eCommerceByZubi {
 		//getting order object
 		$order = wc_get_order($order_id);
 		
-		?>
-		<script type="text/javascript">
-			zubitracker('addTrans',
-				'<?= $order->get_id() ?>',           	 // order ID - required
-				'<?= $sname ?>',						 // affiliation or store name
-				'<?= $order->get_total() ?>',          	 // total - required
-				'<?= $order->get_total_tax() ?>',        // tax
-				'<?= $order->get_shipping_total() ?>',   // shipping
-				'<?= $order->get_billing_city() ?>',     // city
-				'<?= $order->get_billing_state() ?>',    // state or province
-				'<?= $order->get_billing_country() ?>'   // country
-			);
-		</script>
-		<?php
+		echo '<script type="text/javascript">zubitracker("addTrans","'.$order->get_id().'","'.$sname.'","'.$order->get_total().'","'.$order->get_total_tax().'","'.$order->get_shipping_total().'","'.$order->get_billing_city().'","'.$order->get_billing_state().'","'.$order->get_billing_country().'");</script>';
 		
 		$items = $order->get_items();
 		foreach ($items as $item_id => $item_data) {
@@ -153,21 +191,12 @@ class eCommerceByZubi {
 			$item_quantity = $item_data->get_quantity(); // Get the item quantity
 			$unit_price = number_format(((float)$item_data->get_total()/(float)$item_quantity), 2, '.', '');
 			
-			echo '<script type="text/javascript">zubitracker("addItem","<?= $order->id ?>","<?= $product->get_id() ?>","<?= $product->get_name() ?>","","<?= $unit_price ?>","<?= $item_quantity ?>");</script>';
+			echo '<script type="text/javascript">zubitracker("addItem","'.$order->id.'","'.$product->get_id().'","'.$product->get_name().'","","'.$unit_price.'","'.$item_quantity.'");</script>';
 		}
-		?>
-		<script type="text/javascript">
-			zubitracker('trackTrans'); //submits transaction to the collector
-		</script>
-		<?php
+		echo '<script type="text/javascript">zubitracker("trackTrans");</script>';
 	}
-	/**
-	* Outputs the given setting, if conditions are met
-	*
-	* @param string $setting Setting Name
-	* @return output
-	*/
-	function output( $key, $name ) {
+	
+	function allPages() {
 		// Ignore admin, feed, robots or trackbacks
 		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
 			return;
@@ -177,8 +206,8 @@ class eCommerceByZubi {
 			return;
 		}
 		// Get meta
-		$ukey = get_option( $key );
-		$sname = get_option( $name );
+		$ukey = get_option( 'ebz_user_key' );
+		$sname = get_option( 'ebz_store_name' );
 		if ( empty( $sname ) ) {
 			$sname = 'default_store';
 		}
@@ -199,7 +228,7 @@ class eCommerceByZubi {
 					p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];
 					n.async=1;n.src=w;g.parentNode.insertBefore(n,g)}}
 					(window,document,"script","//d1fc8wv8zag5ca.cloudfront.net/2.9.3/sp.js","zubitracker"));
-					window.snowplow("newTracker", "'.$ukey.'", "tracker.zubi.ai", {
+					window.zubitracker("newTracker", "'.$ukey.'", "tracker.zubi.ai", {
 						appId: "'.$sname.'",
 						cookieDomain: "'.$cd.'",
 						forceSecureTracker: true,
