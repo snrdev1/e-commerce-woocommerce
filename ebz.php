@@ -49,7 +49,8 @@ class eCommerceByZubi {
 		add_action( 'woocommerce_cart_item_restored', array( &$this, 'custom_restore_cart'));
 		add_action( 'woocommerce_before_cart_item_quantity_zero', array( &$this, 'custom_zero_qty_cart') ); 
         add_action( 'woocommerce_after_cart_item_quantity_update', array( &$this, 'custom_qty_update_cart') ); 
-		
+		add_action( 'woocommerce_after_shop_loop_item', array( &$this, 'custom_products_displayed') );
+		add_action( 'woocommerce_no_products_found', array( &$this, 'custom_no_products_found') );
 	}
 	
 	function zl_ajax_get_product(){
@@ -139,6 +140,24 @@ class eCommerceByZubi {
 	function loadLanguageFiles() {
 		load_plugin_textdomain( $this->plugin->name, false, $this->plugin->name . '/languages/' );
 	}
+	// No products found
+	function custom_no_products_found(){
+		if (!is_search()){return;}
+		wc_enqueue_js('(function($){
+			window.zubitracker("addEnhancedEcommerceImpressionContext", "no_result","no_result","search_results");
+			window.zubitracker("trackEnhancedEcommerceAction","view");
+		})(jQuery);');
+	}
+	// Search
+	function custom_products_displayed(){
+		if (!is_search()){return;}
+		
+		global $product, $woocommerce; 
+		wc_enqueue_js('(function($){
+			window.zubitracker("addEnhancedEcommerceImpressionContext", "' . $product->get_id() . '","' . $product->get_name() . '","search_results");
+			window.zubitracker("trackEnhancedEcommerceAction","view");
+		})(jQuery);');
+	}
 	function custom_zero_qty_cart( $cart_item_key, $cart ){
 		global $woocommerce; 
         $currency = get_woocommerce_currency();
@@ -179,10 +198,6 @@ class eCommerceByZubi {
 			window.zubitracker("trackEnhancedEcommerceAction","' . $label . '");
 		})(jQuery);');
 	}
-	
-		//add_action( 'woocommerce_before_cart_item_quantity_zero', $cart_item_key, $this );
-        //add_action( 'woocommerce_after_cart_item_quantity_update', $cart_item_key, $quantity, $old_quantity, $this );
-	
 	function custom_add_to_cart( $cart_item_key, $cart ){
 		//return if not product page       
         if (!is_single())
@@ -259,7 +274,7 @@ class eCommerceByZubi {
 		global $product;
         $currency = get_woocommerce_currency();
 		echo '<script type="text/javascript">window.zubitracker("addEnhancedEcommerceProductContext",
-		"'.$product->get_id().'","'.$product->get_name().'","","","","","'.$product->get_price().'","","","","'.$currency.'");
+		"'.$product->get_id().'","'.$product->get_name().'","product_view","","","","'.$product->get_price().'","","","","'.$currency.'");
 		window.zubitracker("trackEnhancedEcommerceAction","view");</script>';
 	}
 	function customReadOrder($order_id) {
