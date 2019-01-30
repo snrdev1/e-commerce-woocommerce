@@ -294,8 +294,8 @@ class eCommerceByZubi {
         $currency = get_woocommerce_currency();
 		//getting order object
 		$order = wc_get_order($order_id);
-		
-		echo '<script type="text/javascript">zubitracker("addTrans","'.$order->get_id().'","'.$sname.'","'.$order->get_total().'","'.$order->get_total_tax().'","'.$order->get_shipping_total().'","'.$order->get_billing_city().'","'.$order->get_billing_state().'","'.$order->get_billing_country().'","'.$currency.'");</script>';
+		$setjs = 'zubitracker("setUserId", "'.$order->get_billing_email().'");';
+		$setjs .= 'zubitracker("addTrans","'.$order->get_id().'","'.$sname.'","'.$order->get_total().'","'.$order->get_total_tax().'","'.$order->get_shipping_total().'","'.$order->get_billing_city().'","'.$order->get_billing_state().'","'.$order->get_billing_country().'","'.$currency.'");';
 		
 		$items = $order->get_items();
 		foreach ($items as $item_id => $item_data) {
@@ -304,9 +304,10 @@ class eCommerceByZubi {
 			$item_quantity = $item_data->get_quantity(); // Get the item quantity
 			$unit_price = number_format(((float)$item_data->get_total()/(float)$item_quantity), 2, '.', '');
 			
-			echo '<script type="text/javascript">zubitracker("addItem","'.$order->id.'","'.$product->get_id().'","'.$product->get_name().'","","'.$unit_price.'","'.$item_quantity.'");</script>';
+			$setjs .= 'zubitracker("addItem","'.$order->id.'","'.$product->get_id().'","'.$product->get_name().'","","'.$unit_price.'","'.$item_quantity.'");';
 		}
-		echo '<script type="text/javascript">zubitracker("trackTrans");</script>';
+		$setjs .= 'zubitracker("trackTrans");';
+		wc_enqueue_js($setjs);
 	}
 	
 	function allPages() {
@@ -335,25 +336,28 @@ class eCommerceByZubi {
 		$sname = str_replace(array('\'', '"'), '', $sname);
 		$cd = str_replace('www','', parse_url(get_site_url(), PHP_URL_HOST));
 		
-		$meta = '<script type="text/javascript">
-					;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];
-					p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)};
-					p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];
-					n.async=1;n.src=w;g.parentNode.insertBefore(n,g)}}
-					(window,document,"script","//d1fc8wv8zag5ca.cloudfront.net/2.9.3/sp.js","zubitracker"));
-					window.zubitracker("newTracker", "'.$ukey.'", "tracker.zubi.ai", {
-						appId: "'.$sname.'",
-						cookieDomain: "'.$cd.'",
-						forceSecureTracker: true,
-						cookieName: "zl",
-						contexts: {webPage: true,gaCookies: true}
-					});
-					window.zubitracker("trackPageView");
-					window.zubitracker("enableLinkClickTracking");
-					zubitracker("enableFormTracking");
-				</script>';
-		// Output
-		echo wp_unslash( $meta );
+		$meta = ';(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];
+				p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)};
+				p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];
+				n.async=1;n.src=w;g.parentNode.insertBefore(n,g)}}
+				(window,document,"script","//d1fc8wv8zag5ca.cloudfront.net/2.9.3/sp.js","zubitracker"));
+				window.zubitracker("newTracker", "'.$ukey.'", "tracker.zubi.ai", {
+					appId: "'.$sname.'",
+					cookieDomain: "'.$cd.'",
+					forceSecureTracker: true,
+					cookieName: "zl",
+					contexts: {webPage: true,gaCookies: true}
+				});
+				window.zubitracker("trackPageView");
+				window.zubitracker("enableLinkClickTracking");
+				zubitracker("enableFormTracking");
+			';
+		if (is_user_logged_in()) {
+			$user = wp_get_current_user();
+			$uid = esc_html( $user->user_email() );
+			$meta .= 'zubitracker("setUserId", "'.$uid.'");';
+		}
+		wc_enqueue_js($meta);
 	}
 	function trigger_for_ajax_add_to_cart() {
 		global $woocommerce; 
