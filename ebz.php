@@ -41,20 +41,16 @@ class eCommerceByZubi {
         add_action( 'wp_head', array( &$this, 'allPages' ) );
 		add_action( 'wp_footer', array( &$this, 'trigger_for_ajax_add_to_cart' ) );
 		add_action( 'woocommerce_before_single_product', array( &$this, 'productPages' ) );
-		//add_action( 'woocommerce_cart_item_removed', array( &$this, 'custom_remove_from_cart'), 10, 2 );
-		//add_action( 'woocommerce_remove_cart_item', array( &$this, 'custom_remove_from_cart'), 10, 2 );
+		add_action( 'woocommerce_after_cart', array( &$this, 'custom_remove_from_cart') );
 		add_action( 'woocommerce_thankyou', array( &$this, 'customReadOrder' ) );
+		add_action( 'woocommerce_add_to_cart', array( &$this, 'custom_add_to_cart') );
+		add_action( 'wp_ajax_nopriv_zl_ajax_product', array( &$this, 'zl_ajax_get_product'));
+		add_action( 'wp_ajax_zl_ajax_product', array( &$this, 'zl_ajax_get_product'));
+		add_action( 'woocommerce_cart_item_restored', array( &$this, 'custom_restore_cart'));
+		add_action( 'woocommerce_before_cart_item_quantity_zero', array( &$this, 'custom_zero_qty_cart') ); 
+        add_action( 'woocommerce_after_cart_item_quantity_update', array( &$this, 'custom_qty_update_cart') ); 
 		
-		add_action('wp_ajax_nopriv_zl_ajax_product', array( &$this, 'zl_ajax_get_product'));
-		add_action('wp_ajax_zl_ajax_product', array( &$this, 'zl_ajax_get_product'));
-		
-		//add_action( 'woocommerce_cart_item_removed', array( &$this, 'zl_item_removed_from_cart'), 10, 2 );
-	
 	}
-	/*function zl_item_removed_from_cart( $cart_item_key, $cart ) {
-
-		echo 'placeholder';
-	}*/
 	
 	function zl_ajax_get_product(){
 		$num = $_GET['pid'];
@@ -143,27 +139,111 @@ class eCommerceByZubi {
 	function loadLanguageFiles() {
 		load_plugin_textdomain( $this->plugin->name, false, $this->plugin->name . '/languages/' );
 	}
-	// do_action( 'woocommerce_cart_item_removed', $cart_item_key, $this );
-	function custom_remove_from_cart( $cart_item_key, $cart ){
-?> <script type="text/javascript">
-	alert('fired');
-	console.dir('fired');
-</script> <?php  
-		// FULL FUNCTIONALITY REQUIRES REINSERT TO CART AND UPDATE QTY IN CART...
-		
-		// Ignore admin, feed, robots or trackbacks
-		//if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
-		//	return;
-		//}
-		// provide the opportunity to Ignore ebz
-		//if ( apply_filters( 'disable_ebz', false ) ) {
-		//	return;
-		//}
-        //echo'<script language="javascript">alert("Test");</script>';
-		//global $woocommerce; 
-        //$currency = get_woocommerce_currency();
-		//$product = wc_get_product( $product_id );
-		//echo '<script language="javascript"></script>';
+	function custom_zero_qty_cart( $cart_item_key, $cart ){
+		global $woocommerce; 
+        $currency = get_woocommerce_currency();
+		$product_id = $cart->cart_contents[ $cart_item_key ]['product_id'];
+		$qty = $cart->cart_contents[$cart_item_key]["quantity"];
+		$product = wc_get_product( $product_id );
+		wc_enqueue_js("var cur = '" . $currency . "';");
+		wc_enqueue_js('(function($){
+			window.zubitracker(
+				"addEnhancedEcommerceProductContext",
+				"' . $product->get_id() . '","' . $product->get_name() . '","","","","",
+				"' . $product->get_price() . '","' . $qty . '","","",cur
+			);
+			window.zubitracker("trackEnhancedEcommerceAction","remove");
+		})(jQuery);');
+	}
+	function custom_qty_update_cart( $cart_item_key, $quantity, $old_quantity, $cart ){
+		global $woocommerce; 
+        $currency = get_woocommerce_currency();
+		$qty = $quantity - $old_quantity;
+		$label = 'add';
+		if ($quantity == $old_quantity) {
+			return;
+		}
+		if ($quantity < $old_quantity) {
+			$qty = $old_quantity - $quantity;
+			$label = 'remove';
+		}	
+		$product_id = $cart->cart_contents[ $cart_item_key ]['product_id'];
+		$product = wc_get_product( $product_id );
+		wc_enqueue_js("var cur = '" . $currency . "';");
+		wc_enqueue_js('(function($){
+			window.zubitracker(
+				"addEnhancedEcommerceProductContext",
+				"' . $product->get_id() . '","' . $product->get_name() . '","","","","",
+				"' . $product->get_price() . '","' . $qty . '","","",cur
+			);
+			window.zubitracker("trackEnhancedEcommerceAction","' . $label . '");
+		})(jQuery);');
+	}
+	
+		//add_action( 'woocommerce_before_cart_item_quantity_zero', $cart_item_key, $this );
+        //add_action( 'woocommerce_after_cart_item_quantity_update', $cart_item_key, $quantity, $old_quantity, $this );
+	
+	function custom_add_to_cart( $cart_item_key, $cart ){
+		//return if not product page       
+        if (!is_single())
+            return;
+		global $woocommerce; 
+        $currency = get_woocommerce_currency();
+		$product_id = $cart->cart_contents[ $cart_item_key ]['product_id'];
+		$qty = $cart->cart_contents[$cart_item_key]["quantity"];
+		$product = wc_get_product( $product_id );
+		wc_enqueue_js("var cur = '" . $currency . "';");
+		wc_enqueue_js('(function($){
+			window.zubitracker(
+				"addEnhancedEcommerceProductContext",
+				"' . $product->get_id() . '","' . $product->get_name() . '","","","","",
+				"' . $product->get_price() . '","' . $qty . '","","",cur
+			);
+			window.zubitracker("trackEnhancedEcommerceAction","add");
+		})(jQuery);');
+	}
+	function custom_restore_cart( $cart_item_key, $cart ){
+		global $woocommerce; 
+        $currency = get_woocommerce_currency();
+		$product_id = $cart->cart_contents[ $cart_item_key ]['product_id'];
+		$qty = $cart->cart_contents[$cart_item_key]["quantity"];
+		$product = wc_get_product( $product_id );
+		wc_enqueue_js("var cur = '" . $currency . "';");
+		wc_enqueue_js('(function($){
+			window.zubitracker(
+				"addEnhancedEcommerceProductContext",
+				"' . $product->get_id() . '","' . $product->get_name() . '","","","","",
+				"' . $product->get_price() . '","' . $qty . '","","",cur
+			);
+			window.zubitracker("trackEnhancedEcommerceAction","add");
+		})(jQuery);');
+	}
+	function custom_remove_from_cart(){
+		global $woocommerce;
+        $cart_items = array();
+        foreach ($woocommerce->cart->cart_contents as $key => $item) {
+            $product = wc_get_product($item["product_id"]);
+            $removeURL = html_entity_decode(wc_get_cart_remove_url($key)); 
+            $cart_items[$removeURL] = array(
+            	"pid" => esc_html($product->get_id()),
+                "pna" => html_entity_decode($product->get_name()),
+                "ppr" => esc_html($product->get_price()),
+                "pqt"=>$woocommerce->cart->cart_contents[$key]["quantity"]
+            );
+        }
+		wc_enqueue_js("var ci = " . json_encode($cart_items) . ";");
+		wc_enqueue_js("var cur = '" . get_woocommerce_currency() . "';");
+		wc_enqueue_js('(function($){
+			$("a[href*=\"?remove_item\"]").click(function(){
+            	var rl=jQuery(this).attr("href");
+				window.zubitracker(
+					"addEnhancedEcommerceProductContext",
+					ci[rl].pid,ci[rl].pna,"","","","",
+					ci[rl].ppr,ci[rl].pqt,"","",cur
+				);
+				window.zubitracker("trackEnhancedEcommerceAction","remove");
+			});
+		})(jQuery);');
 	}
 	function productPages() {
 		// Ignore admin, feed, robots or trackbacks
@@ -174,8 +254,13 @@ class eCommerceByZubi {
 		if ( apply_filters( 'disable_ebz', false ) ) {
 			return;
 		}
+		
+		global $woocommerce; 
 		global $product;
-		echo '<script type="text/javascript">window.zubitracker("addEnhancedEcommerceProductContext","'.$product->get_id().'","'.$product->get_name().'");window.zubitracker("trackEnhancedEcommerceAction","view");</script>';
+        $currency = get_woocommerce_currency();
+		echo '<script type="text/javascript">window.zubitracker("addEnhancedEcommerceProductContext",
+		"'.$product->get_id().'","'.$product->get_name().'","","","","","'.$product->get_price().'","","","","'.$currency.'");
+		window.zubitracker("trackEnhancedEcommerceAction","view");</script>';
 	}
 	function customReadOrder($order_id) {
 		// Ignore admin, feed, robots or trackbacks
@@ -273,6 +358,7 @@ class eCommerceByZubi {
 								data = JSON.parse(data);
 								window.zubitracker("addEnhancedEcommerceProductContext",String(data.id),data.name,"","","","",data.price,qty,"","",cur);
 								window.zubitracker("trackEnhancedEcommerceAction","add");
+								alert("added_to_cart")
 							}
 						);
 					});
@@ -286,6 +372,7 @@ class eCommerceByZubi {
 								data = JSON.parse(data);
 								window.zubitracker("addEnhancedEcommerceProductContext",String(data.id),data.name,"","","","",data.price,qty,"","",cur);
 								window.zubitracker("trackEnhancedEcommerceAction","remove");
+								alert("removed_from_cart")
 							}
 						);
 					});
