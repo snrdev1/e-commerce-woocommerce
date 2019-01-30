@@ -9,15 +9,14 @@
 * Copyright 2019 ZubiLabs AB
 * License: GPL3
 */
-if (!defined('ABSPATH'))
-{
+// Exit if accessed directly
+if (!defined('ABSPATH')) {
     exit;
-} // Exit if accessed directly
-/*if (!class_exists('WooCommerce'))
-{
+} 
+// Exit if WooCommerce is not active
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
     exit;
-}// Exit if WooCommerce is not active
-*/
+}
 
 class eCommerceByZubi {
 	/**
@@ -51,6 +50,13 @@ class eCommerceByZubi {
         add_action( 'woocommerce_after_cart_item_quantity_update', array( &$this, 'custom_qty_update_cart') ); 
 		add_action( 'woocommerce_after_shop_loop_item', array( &$this, 'custom_products_displayed') );
 		add_action( 'woocommerce_no_products_found', array( &$this, 'custom_no_products_found') );
+	}
+	
+	function trackingDisabled(){
+		// Ignore admin, feed, robots or trackbacks
+		if ( is_admin() || is_feed() || is_robots() || is_trackback() || get_option( 'ebz_is_disabled' ) ) {
+			return true; // disabled
+		} else { return false; }
 	}
 	
 	function zl_ajax_get_product(){
@@ -90,6 +96,7 @@ class eCommerceByZubi {
 	function registerSettings() {
 		register_setting( $this->plugin->name, 'ebz_user_key', 'trim' );
 		register_setting( $this->plugin->name, 'ebz_store_name', 'trim' );
+		register_setting( $this->plugin->name, 'ebz_is_disabled', 'trim' );
 	}
 	/**
     * Register the plugin settings panel
@@ -121,7 +128,8 @@ class eCommerceByZubi {
 				// $_REQUEST has already been slashed by wp_magic_quotes in wp-settings
 				// so do nothing before saving
 	    		update_option( 'ebz_user_key', $_REQUEST['ebz_user_key'] );
-	    		update_option( 'ebz_store_name', $_REQUEST['ebz_store_name'] );
+	    		update_option( 'ebz_store_name', $_REQUEST['ebz_store_name'] ); 
+	    		update_option( 'ebz_is_disabled', $_REQUEST['ebz_is_disabled'] );
 	    		update_option( $this->plugin->db_welcome_dismissed_key, 1 );
 				$this->message = __( 'Settings Saved.', $this->plugin->name );
 			}
@@ -130,6 +138,7 @@ class eCommerceByZubi {
         $this->settings = array(
 			'ebz_user_key' => esc_html( wp_unslash( get_option( 'ebz_user_key' ) ) ),
 			'ebz_store_name' => esc_html( wp_unslash( get_option( 'ebz_store_name' ) ) ),
+			'ebz_is_disabled' => esc_html( wp_unslash( get_option( 'ebz_is_disabled' ) ) ),
         );
     	// Load Settings Form
         include_once( WP_PLUGIN_DIR . '/' . $this->plugin->name . '/views/settings.php' );
@@ -142,6 +151,9 @@ class eCommerceByZubi {
 	}
 	// No products found
 	function custom_no_products_found(){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		if (!is_search()){return;}
 		wc_enqueue_js('(function($){
 			window.zubitracker("addEnhancedEcommerceImpressionContext", "no_result","no_result","search_results");
@@ -150,6 +162,9 @@ class eCommerceByZubi {
 	}
 	// Search
 	function custom_products_displayed(){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		if (!is_search()){return;}
 		
 		global $product, $woocommerce; 
@@ -159,6 +174,9 @@ class eCommerceByZubi {
 		})(jQuery);');
 	}
 	function custom_zero_qty_cart( $cart_item_key, $cart ){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		global $woocommerce; 
         $currency = get_woocommerce_currency();
 		$product_id = $cart->cart_contents[ $cart_item_key ]['product_id'];
@@ -175,6 +193,9 @@ class eCommerceByZubi {
 		})(jQuery);');
 	}
 	function custom_qty_update_cart( $cart_item_key, $quantity, $old_quantity, $cart ){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		global $woocommerce; 
         $currency = get_woocommerce_currency();
 		$qty = $quantity - $old_quantity;
@@ -199,6 +220,9 @@ class eCommerceByZubi {
 		})(jQuery);');
 	}
 	function custom_add_to_cart( $cart_item_key, $cart ){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		//return if not product page       
         if (!is_single())
             return;
@@ -218,6 +242,9 @@ class eCommerceByZubi {
 		})(jQuery);');
 	}
 	function custom_restore_cart( $cart_item_key, $cart ){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		global $woocommerce; 
         $currency = get_woocommerce_currency();
 		$product_id = $cart->cart_contents[ $cart_item_key ]['product_id'];
@@ -234,6 +261,9 @@ class eCommerceByZubi {
 		})(jQuery);');
 	}
 	function custom_remove_from_cart(){
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		global $woocommerce;
         $cart_items = array();
         foreach ($woocommerce->cart->cart_contents as $key => $item) {
@@ -261,14 +291,8 @@ class eCommerceByZubi {
 		})(jQuery);');
 	}
 	function productPages() {
-		// Ignore admin, feed, robots or trackbacks
-		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
-			return;
-		}
-		// provide the opportunity to Ignore ebz
-		if ( apply_filters( 'disable_ebz', false ) ) {
-			return;
-		}
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
 		
 		global $woocommerce; 
 		global $product;
@@ -278,14 +302,9 @@ class eCommerceByZubi {
 		window.zubitracker("trackEnhancedEcommerceAction","view");</script>';
 	}
 	function customReadOrder($order_id) {
-		// Ignore admin, feed, robots or trackbacks
-		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
-			return;
-		}
-		// provide the opportunity to Ignore ebz
-		if ( apply_filters( 'disable_ebz', false ) ) {
-			return;
-		}
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		$sname = get_option( 'ebz_store_name' );
 		if ( empty( $sname ) ) {
 			$sname = 'default_store';
@@ -311,14 +330,9 @@ class eCommerceByZubi {
 	}
 	
 	function allPages() {
-		// Ignore admin, feed, robots or trackbacks
-		if ( is_admin() || is_feed() || is_robots() || is_trackback() ) {
-			return;
-		}
-		// provide the opportunity to Ignore ebz
-		if ( apply_filters( 'disable_ebz', false ) ) {
-			return;
-		}
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		// Get meta
 		$ukey = get_option( 'ebz_user_key' );
 		$sname = get_option( 'ebz_store_name' );
@@ -360,6 +374,9 @@ class eCommerceByZubi {
 		wc_enqueue_js($meta);
 	}
 	function trigger_for_ajax_add_to_cart() {
+		// Return if tracking is disabled
+		if ( $this->trackingDisabled() ) {return;}
+		
 		global $woocommerce; 
         $currency = get_woocommerce_currency();
 		?>
